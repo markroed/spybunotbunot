@@ -157,8 +157,28 @@ $receiver_wishlist = $receiver ? ($wishlist[$receiver] ?? []) : [];
 <div class="container">
 <?php if (!$user): ?>
     <h2>🎄 Enter Your PIN to Login</h2>
+
+     <div style="text-align:center; margin-bottom:20px;">
+        <img src="yourpicture.jpg" alt="Secret Santa" style="max-width:200px; border-radius:12px;">
+    </div>
+
+    <h3>Already Finished Drawing:</h3>
+    <ul>
+        <?php
+        if (!empty($mapping)) {
+            foreach ($mapping as $drawer => $got) {
+                echo "<li><strong>" . htmlspecialchars($drawer) . "</strong></li>";
+            }
+        } else {
+            echo "<p>No one has drawn yet.</p>";
+        }
+        ?>
+    </ul>
+
+
     <?php if (!empty($login_error)) echo "<p style='color:red;'>$login_error</p>"; ?>
-    <form method="POST">
+   <form method="POST" onsubmit="return confirm('Are you sure ikaw ni? Ang mamakak anak sa debel!');">
+
         <input type="password" name="pin" placeholder="Your PIN" required>
         <button type="submit" class="btn">Login</button>
     </form>
