@@ -16,6 +16,7 @@ $participants = [
 $data_dir = __DIR__ . "/data";
 $mapping_file = $data_dir . "/mapping.json";
 $wishlist_file = $data_dir . "/wishlist.json";
+$pins_file = $data_dir . "/pins.json";
 
 // Ensure data folder
 if (!is_dir($data_dir)) mkdir($data_dir, 0777, true);
@@ -24,13 +25,16 @@ if (!is_dir($data_dir)) mkdir($data_dir, 0777, true);
 $mapping = file_exists($mapping_file) ? json_decode(file_get_contents($mapping_file), true) : [];
 $wishlist = file_exists($wishlist_file) ? json_decode(file_get_contents($wishlist_file), true) : [];
 
+// Load pins (for live updates) or fallback to participants
+$pins = file_exists($pins_file) ? json_decode(file_get_contents($pins_file), true) : $participants;
+
 // SESSION for login
 session_start();
 
 // Login handling
 if (isset($_POST['pin'])) {
     $pin = trim($_POST['pin']);
-    $user = array_search($pin, $participants);
+    $user = array_search($pin, $pins);
     if ($user) {
         $_SESSION['user'] = $user;
     } else {
@@ -67,6 +71,16 @@ if ($user && isset($_POST['wishlist_item'])) {
     }
 }
 
+// Change PIN handling
+if ($user && isset($_POST['new_pin'])) {
+    $new_pin = trim($_POST['new_pin']);
+    if ($new_pin !== '') {
+        $pins[$user] = $new_pin;
+        file_put_contents($pins_file, json_encode($pins));
+        $pin_success = "PIN successfully changed!";
+    }
+}
+
 // Get current user's receiver
 $receiver = $mapping[$user] ?? null;
 $receiver_wishlist = $receiver ? ($wishlist[$receiver] ?? []) : [];
@@ -77,78 +91,19 @@ $receiver_wishlist = $receiver ? ($wishlist[$receiver] ?? []) : [];
     <title>Secret Santa</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: #f2f5f7;
-            margin: 0;
-            padding: 0;
-        }
-        .container {
-            max-width: 700px;
-            margin: 40px auto;
-            background: #fff;
-            border-radius: 12px;
-            padding: 30px;
-            box-shadow: 0 8px 20px rgba(0,0,0,0.1);
-        }
-        h2 {
-            color: #333;
-            margin-bottom: 20px;
-        }
-        h3 {
-            color: #444;
-            margin-top: 30px;
-            margin-bottom: 10px;
-        }
-        .btn {
-            display: inline-block;
-            padding: 12px 25px;
-            margin: 10px 5px 0 0;
-            font-size: 16px;
-            color: #fff;
-            background: #ff6b6b;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: background 0.3s;
-        }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f2f5f7; margin: 0; padding: 0; }
+        .container { max-width: 700px; margin: 40px auto; background: #fff; border-radius: 12px; padding: 30px; box-shadow: 0 8px 20px rgba(0,0,0,0.1); }
+        h2 { color: #333; margin-bottom: 20px; }
+        h3 { color: #444; margin-top: 30px; margin-bottom: 10px; }
+        .btn { display: inline-block; padding: 12px 25px; margin: 10px 5px 0 0; font-size: 16px; color: #fff; background: #ff6b6b; border: none; border-radius: 8px; cursor: pointer; transition: background 0.3s; }
         .btn:hover { background: #ff4757; }
-        .btn:disabled {
-            background: #ccc;
-            color: #666;
-            cursor: not-allowed;
-        }
-        input[type="text"], input[type="password"] {
-            padding: 12px;
-            font-size: 16px;
-            border-radius: 8px;
-            border: 1px solid #ccc;
-            width: 70%;
-            margin-bottom: 10px;
-        }
-        #wishlist-list, ul { 
-            list-style-type: disc; 
-            padding-left: 20px; 
-            text-align: left;
-        }
-        .card {
-            background: #f9f9f9;
-            border-radius: 10px;
-            padding: 20px;
-            margin: 15px 0;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-        }
-        .wishlist-title {
-            color: #555;
-            margin-bottom: 5px;
-        }
-        .logout {
-            margin-top: 20px;
-            background: #576574;
-        }
-        .logout:hover {
-            background: #2f3542;
-        }
+        .btn:disabled { background: #ccc; color: #666; cursor: not-allowed; }
+        input[type="text"], input[type="password"] { padding: 12px; font-size: 16px; border-radius: 8px; border: 1px solid #ccc; width: 70%; margin-bottom: 10px; }
+        #wishlist-list, ul { list-style-type: disc; padding-left: 20px; text-align: left; }
+        .card { background: #f9f9f9; border-radius: 10px; padding: 20px; margin: 15px 0; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+        .wishlist-title { color: #555; margin-bottom: 5px; }
+        .logout { margin-top: 20px; background: #576574; }
+        .logout:hover { background: #2f3542; }
         p { color: #333; }
     </style>
 </head>
@@ -158,7 +113,7 @@ $receiver_wishlist = $receiver ? ($wishlist[$receiver] ?? []) : [];
 <?php if (!$user): ?>
     <h2>🎄 Enter Your PIN to Login</h2>
 
-     <div style="text-align:center; margin-bottom:20px;">
+    <div style="text-align:center; margin-bottom:20px;">
         <img src="yourpicture.jpg" alt="Secret Santa" style="max-width:200px; border-radius:12px;">
     </div>
 
@@ -175,10 +130,8 @@ $receiver_wishlist = $receiver ? ($wishlist[$receiver] ?? []) : [];
         ?>
     </ul>
 
-
     <?php if (!empty($login_error)) echo "<p style='color:red;'>$login_error</p>"; ?>
-   <form method="POST" onsubmit="return confirm('Are you sure ikaw ni? Ang mamakak anak sa debel!');">
-
+    <form method="POST" onsubmit="return confirm('Are you sure ikaw ni? Ang mamakak anak sa debel!');">
         <input type="password" name="pin" placeholder="Your PIN" required>
         <button type="submit" class="btn">Login</button>
     </form>
@@ -220,6 +173,20 @@ $receiver_wishlist = $receiver ? ($wishlist[$receiver] ?? []) : [];
                 <?php endforeach; ?>
             </ul>
         <?php endif; ?>
+    </div>
+
+    <!-- CHANGE PIN SECTION -->
+    <div class="card">
+        <h3>Change Your PIN</h3>
+
+        <?php if (!empty($pin_success)): ?>
+            <p style="color:green;"><?= $pin_success ?></p>
+        <?php endif; ?>
+
+        <form method="POST" onsubmit="return confirm('Sure ka mo-change ug PIN?');">
+            <input type="password" name="new_pin" placeholder="Enter new PIN" required>
+            <button type="submit" class="btn">Update PIN</button>
+        </form>
     </div>
 
     <form method="POST">
